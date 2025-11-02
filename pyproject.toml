@@ -1,0 +1,7 @@
+[project]
+name = "1026-pi-pico"
+version = "0.1.0"
+description = "這是樹梅派跟Pico整合的專案"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []

@@ -1,0 +1,225 @@
+
+## Cursor GEMINI 延伸模組無法執行的解決方法
+
+### 問題診斷步驟
+
+1. **檢查延伸模組是否已安裝**
+   - 開啟 Cursor
+   - 點擊左側擴展圖示（或按 `Ctrl+Shift+X`）
+   - 搜尋 "Gemini" 或 "Google Gemini"
+   - 確認是否已安裝並啟用
+
+2. **檢查延伸模組狀態**
+   - 查看延伸模組是否顯示錯誤訊息
+   - 檢查延伸模組是否需要重新載入
+   - 查看 Cursor 的輸出面板（`Ctrl+Shift+U`）尋找錯誤訊息
+
+3. **常見解決方法**
+
+   **方法一：檢查延伸模組是否已啟用（最重要！）**
+   - 開啟 Cursor 設定（`Ctrl+,` 或 `File > Preferences > Settings`）
+   - 搜尋 "geminicodeassist.enable"
+   - 確認該選項已勾選/啟用
+   - **重要**：變更此設定後，需要重新載入 Cursor 視窗才能生效
+   - 重新載入方法：按 `Ctrl+Shift+P`，輸入 "Reload Window" 並執行
+
+   **方法二：移除重複的延伸模組版本**
+   - 如果發現有多個版本的 GEMINI 延伸模組（例如 2.56.0 和 2.57.0），可能造成衝突
+   - 在 Cursor 中，只保留最新版本
+   - 移除舊版本：點擊延伸模組，選擇 "Uninstall"
+   - 或手動刪除舊版本目錄：`rm -rf ~/.cursor-server/extensions/google.geminicodeassist-2.56.0-universal`
+   - 重新啟動 Cursor
+
+   **方法三：檢查 API 金鑰設定**
+   - 確認是否已設定 Google Gemini API 金鑰
+   - 檢查設定中的 API 金鑰是否正確
+   - 確認 API 金鑰是否有效（未過期或被撤銷）
+
+   **方法四：重新安裝延伸模組**
+   - 在 Cursor 中解除安裝 GEMINI 延伸模組
+   - 關閉並重新啟動 Cursor
+   - 重新安裝延伸模組（搜尋 "Gemini Code Assist"）
+   - 確認安裝後，檢查設定中的 `geminicodeassist.enable` 是否已啟用
+   - 重新載入 Cursor 視窗
+
+   **方法五：檢查網路連線**
+   - 確認網路連線正常
+   - 檢查防火牆是否阻擋 Cursor 的網路連線
+   - 如果在代理環境下，確認代理設定正確
+   - 測試連線：`curl -I https://generativelanguage.googleapis.com`
+
+   **方法六：檢查 Cursor 版本**
+   - 確認 Cursor 是否為最新版本
+   - 更新 Cursor 到最新版本
+   - 某些舊版本可能不支援某些延伸模組功能
+
+   **方法七：清除快取並重新載入**
+   - 關閉 Cursor
+   - 清除 Cursor 的快取資料：
+     ```bash
+     # 清除延伸模組快取（謹慎使用，會移除所有延伸模組的快取）
+     rm -rf ~/.cursor-server/data/CachedExtensions
+     # 清除工作區快取
+     rm -rf ~/.cursor-server/data/User/workspaceStorage
+     ```
+   - 重新啟動 Cursor
+   - 重新安裝延伸模組
+
+   **方法八：檢查系統權限**
+   - 確認 Cursor 有足夠的系統權限
+   - 在 Linux 上，確認檔案權限設定正確
+   - 檢查是否有其他程序占用資源
+
+4. **檢查日誌檔案**
+   - 查看 Cursor 的日誌檔案以獲取詳細錯誤訊息
+   - 日誌檔案通常位於：
+     - Linux: `~/.cursor-server/data/logs/`（最新日期目錄）
+     - 延伸模組日誌：`~/.cursor-server/data/logs/[日期]/exthost*/remoteexthost.log`
+   - 檢查 GEMINI 延伸模組的錯誤：
+     ```bash
+     # 查看最新的延伸模組日誌
+     tail -100 ~/.cursor-server/data/logs/$(ls -t ~/.cursor-server/data/logs/ | head -1)/exthost*/remoteexthost.log | grep -i "gemini\|error"
+     ```
+
+5. **替代方案**
+   - 如果 GEMINI 延伸模組持續無法運作，可以考慮：
+     - 使用其他 AI 延伸模組（如 GitHub Copilot、Codeium 等）
+     - 直接使用 Google Gemini API 進行整合
+     - 檢查是否有其他相容的延伸模組
+
+### 快速檢查指令（在終端機執行）
+
+```bash
+# 檢查 Cursor 是否正在執行
+ps aux | grep cursor
+
+# 檢查 GEMINI 延伸模組是否已安裝（Cursor 遠端伺服器模式）
+ls -la ~/.cursor-server/extensions/ | grep -i gemini
+
+# 檢查延伸模組版本（可能有多個版本造成衝突）
+ls -la ~/.cursor-server/extensions/google.geminicodeassist-*
+
+# 檢查延伸模組配置
+cat ~/.cursor-server/extensions/google.geminicodeassist-*/package.json | grep -A 3 "geminicodeassist.enable"
+
+# 檢查 Cursor 日誌（最新日誌）
+tail -50 ~/.cursor-server/data/logs/$(ls -t ~/.cursor-server/data/logs/ | head -1)/exthost*/remoteexthost.log
+
+# 檢查延伸模組進程是否正在執行
+ps aux | grep gemini
+```
+
+### 常見問題與解決方案
+
+**問題 1：延伸模組已安裝但無法使用**
+- **解決方案**：檢查 `geminicodeassist.enable` 設定是否已啟用，並重新載入 Cursor
+
+**問題 2：多個版本的延伸模組造成衝突**
+- **解決方案**：移除舊版本，只保留最新版本
+
+**問題 3：延伸模組進程無法啟動**
+- **解決方案**：檢查日誌檔案中的錯誤訊息，可能需要重新安裝或檢查 API 金鑰
+
+**問題 4：設定變更後無效**
+- **解決方案**：變更 `geminicodeassist.enable` 設定後，必須重新載入 Cursor 視窗才會生效
+
+### 聯繫支援
+
+如果以上方法都無法解決問題：
+- 檢查 Cursor 官方文件
+- 查看延伸模組的 GitHub 頁面（如果有）
+- 聯繫 Cursor 技術支援
+- 查看相關的 GitHub Issues
+
+## 如何同步到 GitHub
+
+### 方法 1：使用 GitHub Personal Access Token（推荐）
+
+1. 生成 Token：
+   - 访问 https://github.com/settings/tokens
+   - 点击 "Generate new token (classic)"
+   - 勾选 `repo` 权限
+   - 复制生成的 token
+
+2. 使用 token 推送：
+   ```bash
+   git push -u origin main
+   ```  
+   当提示输入密码时，使用 token（不是你的 GitHub 密码）
+
+### 方法 2：配置 SSH 密钥
+
+1. 生成 SSH 密钥（如果还没有）：
+   ```bash
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   ```
+
+2. 将公钥添加到 GitHub：
+   - 复制 `~/.ssh/id_ed25519.pub` 的内容
+   - 访问 https://github.com/settings/keys
+   - 点击 "New SSH key"，添加公钥           
+
+3. 更改远程 URL 为 SSH：
+   ```bash
+   git remote set-url origin git@github.com:holywrite-svg/1026_raspberry_pico.git
+   ```
+
+4. 推送：
+   ```bash
+   git push -u origin main
+   ```          
+## 基本同步命令
+
+- 提交更改：
+  ```bash
+  git add .
+  git commit -m "提交信息"
+  ```
+
+- 推送到 GitHub：
+  ```bash
+  git push origin main
+  ```   
+
+##以下Agents執行後的效果紀錄待後續參考
+  正在克隆 roberthsu2003/learningPythonFromZero 倉庫。
+--: 列 1: gh：指令找不到
+未安裝 GitHub CLI (gh)。改用 git clone 克隆該倉庫：
+正複製到 'learningPythonFromZero'...
+已成功克隆倉庫。確認內容：
+總用量 96
+drwxrwxr-x 19 pi pi 4096 11月  9 10:41 .
+drwxrwxr-x  5 pi pi 4096 11月  9 10:41 ..
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 BeautifulSoup4的基本操作
+drwxrwxr-x  2 pi pi 4096 11月  9 10:41 .claude
+drwxrwxr-x  2 pi pi 4096 11月  9 10:41 .devcontainer
+-rw-rw-r--  1 pi pi 6148 11月  9 10:41 .DS_Store
+drwxrwxr-x  8 pi pi 4096 11月  9 10:41 .git
+-rw-rw-r--  1 pi pi   27 11月  9 10:41 gitignore
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 python_list的操控
+drwxrwxr-x  2 pi pi 4096 11月  9 10:41 python下載網路資料
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 python內建的4個基本資料類型
+drwxrwxr-x  4 pi pi 4096 11月  9 10:41 python函式
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 python基礎運算
+drwxrwxr-x  4 pi pi 4096 11月  9 10:41 python流程控制-判斷
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 python流程控制-迴圈
+drwxrwxr-x  4 pi pi 4096 11月  9 10:41 python資料結構
+-rw-rw-r--  1 pi pi  860 11月  9 10:41 README.md
+-rw-rw-r--  1 pi pi    8 11月  9 10:41 requirements.txt
+drwxrwxr-x  3 pi pi 4096 11月  9 10:41 下載youbike即時資訊
+已成功克隆 learningPythonFromZero 倉庫到 /home/pi/Documents/Github/learningPythonFromZero/。
+該倉庫包含以下內容：
+BeautifulSoup4的基本操作
+python_list的操控
+python下載網路資料
+python內建的4個基本資料類型
+python函式
+python基礎運算
+python流程控制-判斷
+python流程控制-迴圈
+python資料結構
+下載youbike即時資訊
+備註： 系統未安裝 GitHub CLI (gh)，已改用 git clone 完成克隆。
+如需安裝 GitHub CLI，可執行：
+sudo apt updatesudo apt install gh
+可開始使用這個 Python 學習倉庫。需要我協助查看或操作其中的內容嗎？

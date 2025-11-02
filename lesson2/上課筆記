@@ -1,0 +1,52 @@
+#筆記
+##使用UV
+-在樹莓派（Raspberry Pi）上安裝 uv（即 Astral 的超快速 Python 套件管理工具）其實非常簡單，只要幾個指令就能完成。以下是詳細步驟 👇
+-🧰 一、確認你的環境
+-首先請確定你有：
+-Raspberry Pi OS（或其他基於 Debian 的 Linux）
+-已安裝 curl（通常預設就有）
+-可先執行：
+- sudo apt update
+sudo apt install curl -y
+🚀 二、安裝 uv
+官方推薦使用這個安裝指令（適用所有 Linux）：
+curl -LsSf https://astral.sh/uv/install.sh | sh
+這會自動：
+下載適合你 CPU 架構（ARM、ARM64、x86）的 uv 二進位檔
+安裝到 ~/.local/bin/uv
+⚙️ 三、將 uv 加入 PATH（若還沒自動設定）
+執行以下命令讓系統能找到 uv：
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+🧪 四、確認安裝成功
+輸入：
+uv --version
+如果能看到版本號（例如 uv 0.5.x），就代表成功了 🎉
+📦 五、用法範例
+安裝套件（類似 pip）：
+uv add requests
+建立新虛擬環境：
+uv venv
+或直接執行 Python：
+uv run python app.py
+如果你用的是特別舊的樹莓派（例如 Raspberry Pi Zero 或 3B），可能會遇到架構不支援的情況（特別是 32-bit OS）。
+那時可以：
+改裝 64-bit Raspberry Pi OS
+或用 pipx 安裝 uv（會稍慢但相容）：
+pip install --user uv
+
+##建立UV說明檔
+-uv init --python 3.10
+-會出現"main.py"跟"pyproject.toml"
+可以刪除 main.py
+並且在"pyproject.toml"中加入以下內容：
+[project]
+name = "1026-pi-pico"<--專案名稱>可以修改不用跟資料夾同名
+version = "0.1.0"<--版本號>
+description = "這是樹梅派跟Pico整合的專案"<--專案描述>可以修改
+readme = "README.md"
+requires-python = ">=3.10"<--Python版本>
+dependencies = []<--依賴的套件>沒有就會安裝套件就會空白
+
+-uv venv
+會出現"venv"
