@@ -1,0 +1,89 @@
+#Linux基礎指令
+
+1. mv (Move) - 移動或重新命名檔案/目錄
+mv 指令有兩大功能：移動檔案/目錄到新的位置，或者在原地重新命名。
+
+語法: mv [選項] <來源> <目的地>
+
+功能 A：重新命名 如果來源和目的地在同一個目錄下，mv 的作用就是重新命名。
+
+bash
+# 將 file1.txt 重新命名為 report.txt
+mv file1.txt report.txt
+
+# 將 my_project 這個目錄重新命名為 project_final
+mv my_project project_final
+功能 B：移動 如果目的地是一個已經存在的目錄，mv 會將來源檔案或目錄移動到該目錄下。
+
+bash
+# 將 report.txt 移動到 /home/pi/Documents/ 目錄下
+mv report.txt /home/pi/Documents/
+
+# 將 project_final 這個目錄移動到 backup/ 目錄下
+mv project_final/ backup/
+常用選項：
+
+-i (interactive): 如果目的地檔案已存在，會先詢問是否覆蓋。
+-v (verbose): 顯示每個檔案被移動的過程。
+2. rm (Remove) - 刪除檔案或目錄
+rm 用來刪除檔案和目錄。請務必小心使用此指令，因為它刪除的檔案通常無法復原！
+
+語法: rm [選項] <檔案/目錄>
+
+刪除檔案：
+
+bash
+# 刪除一個名為 old_data.csv 的檔案
+rm old_data.csv
+刪除目錄： 要刪除目錄，必須加上 -r (recursive) 選項，它會一併刪除目錄內的所有內容。
+
+bash
+# 刪除 temp_files 這個目錄以及其下的所有檔案
+rm -r temp_files/
+重要選項：
+
+-i (interactive): 在刪除每個檔案前都會進行確認，可以防止誤刪。
+-r (recursive): 遞迴刪除，刪除目錄時必須使用。
+-f (force): 強制刪除，不會有任何提示。與 -r 結合使用 (rm -rf /) 是 Linux 中最危險的指令之一，請謹慎使用！
+3. ls (List) - 列出檔案和目錄
+ls 是檢視目前所在位置有哪些檔案和目錄的最基本指令。
+
+語法: ls [選項] [路徑]
+
+常用方式：
+
+bash
+ Show full code block 
+# 列出目前目錄的內容
+ls
+
+# 列出指定目錄的內容
+ls /home/pi/Documents/
+
+# 使用長格式 (long format) 顯示詳細資訊，包含權限、擁有者、大小、修改日期等
+ls -l
+
+# 顯示所有檔案，包含以 "." 開頭的隱藏檔
+ls -a
+
+# 結合使用，顯示所有檔案的詳細資訊
+ls -al
+4. mkdir (Make Directory) - 建立新目錄
+mkdir 用來建立新的空目錄。
+
+語法: mkdir [選項] <目錄名稱>
+
+bash
+# 在目前位置建立一個名為 "images" 的目錄
+mkdir images
+
+# 建立一個多層的目錄結構，-p 會自動建立不存在的父目錄
+mkdir -p project/src/components
+總結：基礎檔案操作指令
+指令	功能	範例
+cp	複製檔案或目錄	cp file.txt backup/
+mv	移動或重新命名	mv old.txt new.txt
+rm	刪除檔案或目錄	rm data.log
+ls	列出內容	ls -l
+mkdir	建立目錄	mkdir my_new_folder
+掌握這五個指令，您就可以在 Linux 的指令列環境中完成絕大多數的檔案管理工作了！
