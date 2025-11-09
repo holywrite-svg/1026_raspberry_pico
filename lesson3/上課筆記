@@ -50,3 +50,13 @@ dependencies = []<--依賴的套件>沒有就會安裝套件就會空白
 
 -uv venv
 會出現"venv"
+
+uv run python --version
+會出現Python版本
+deactivate 跳出虛擬環境
+
+
+#uv版本控制的方法
+可以在.python-version中設定Python版本
+使用pyproject.toml設定版本資訊
+增減模組套件都會顯示在pyproject的檔案中
