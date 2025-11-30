@@ -967,6 +967,770 @@ if uploaded_file is not None:
     st.dataframe(df, use_container_width=True)
 ```
 
+## MQTT 物聯網整合
+
+Streamlit 可以與 MQTT（Message Queuing Telemetry Transport）協議整合，實現與物聯網設備的即時通訊。MQTT 是一種輕量級的發布/訂閱訊息傳輸協議，廣泛用於物聯網應用。
+
+### 基礎用法
+
+#### 安裝 MQTT 客戶端庫
+
+本專案已包含 `paho-mqtt`，如需單獨安裝：
+
+```bash
+uv pip install paho-mqtt
+```
+
+#### 基本 MQTT 連接和訂閱
+
+```python
+import streamlit as st
+import paho.mqtt.client as mqtt
+import json
+import threading
+import time
+
+# MQTT 設定
+MQTT_BROKER = "192.168.0.252"  # MQTT Broker IP 位址
+MQTT_PORT = 1883
+MQTT_USERNAME = "pi"  # 如果不需要認證，設為 None
+MQTT_PASSWORD = "raspberry"  # 如果不需要認證，設為 None
+MQTT_TOPIC = "sensor/temperature"  # 訂閱的主題
+
+# 初始化 Session State
+if 'mqtt_messages' not in st.session_state:
+    st.session_state.mqtt_messages = []
+if 'mqtt_client' not in st.session_state:
+    st.session_state.mqtt_client = None
+if 'mqtt_connected' not in st.session_state:
+    st.session_state.mqtt_connected = False
+
+# MQTT 回調函數
+def on_connect(client, userdata, flags, rc):
+    """連接成功時的回調"""
+    if rc == 0:
+        st.session_state.mqtt_connected = True
+        st.session_state.mqtt_messages.append({
+            'type': 'system',
+            'message': '✅ MQTT 連接成功',
+            'timestamp': time.time()
+        })
+        # 訂閱主題
+        client.subscribe(MQTT_TOPIC)
+    else:
+        st.session_state.mqtt_messages.append({
+            'type': 'error',
+            'message': f'❌ MQTT 連接失敗，錯誤代碼: {rc}',
+            'timestamp': time.time()
+        })
+
+def on_message(client, userdata, msg):
+    """收到訊息時的回調"""
+    try:
+        payload = msg.payload.decode('utf-8')
+        topic = msg.topic
+        
+        # 嘗試解析 JSON
+        try:
+            data = json.loads(payload)
+        except:
+            data = payload
+        
+        st.session_state.mqtt_messages.append({
+            'type': 'message',
+            'topic': topic,
+            'data': data,
+            'timestamp': time.time()
+        })
+    except Exception as e:
+        st.session_state.mqtt_messages.append({
+            'type': 'error',
+            'message': f'處理訊息時發生錯誤: {str(e)}',
+            'timestamp': time.time()
+        })
+
+def on_disconnect(client, userdata, rc):
+    """斷開連接時的回調"""
+    st.session_state.mqtt_connected = False
+    st.session_state.mqtt_messages.append({
+        'type': 'system',
+        'message': '⚠️ MQTT 連接已斷開',
+        'timestamp': time.time()
+    })
+
+# 連接 MQTT
+def connect_mqtt():
+    """建立 MQTT 連接"""
+    if st.session_state.mqtt_client is None:
+        client = mqtt.Client()
+        
+        # 設定認證（如果需要）
+        if MQTT_USERNAME and MQTT_PASSWORD:
+            client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        
+        # 設定回調函數
+        client.on_connect = on_connect
+        client.on_message = on_message
+        client.on_disconnect = on_disconnect
+        
+        # 連接
+        try:
+            client.connect(MQTT_BROKER, MQTT_PORT, 60)
+            client.loop_start()  # 在背景執行網路循環
+            st.session_state.mqtt_client = client
+        except Exception as e:
+            st.error(f"連接失敗: {str(e)}")
+
+# 斷開 MQTT 連接
+def disconnect_mqtt():
+    """斷開 MQTT 連接"""
+    if st.session_state.mqtt_client:
+        st.session_state.mqtt_client.loop_stop()
+        st.session_state.mqtt_client.disconnect()
+        st.session_state.mqtt_client = None
+        st.session_state.mqtt_connected = False
+
+# Streamlit 介面
+st.title("MQTT 物聯網監控儀表板")
+
+# 連接控制
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("連接 MQTT", disabled=st.session_state.mqtt_connected):
+        connect_mqtt()
+        st.rerun()
+
+with col2:
+    if st.button("斷開連接", disabled=not st.session_state.mqtt_connected):
+        disconnect_mqtt()
+        st.rerun()
+
+# 顯示連接狀態
+if st.session_state.mqtt_connected:
+    st.success("🟢 MQTT 已連接")
+else:
+    st.error("🔴 MQTT 未連接")
+
+# 顯示收到的訊息
+st.subheader("收到的訊息")
+if st.session_state.mqtt_messages:
+    # 只顯示最近 50 條訊息
+    recent_messages = st.session_state.mqtt_messages[-50:]
+    for msg in reversed(recent_messages):
+        if msg['type'] == 'message':
+            st.json({
+                '主題': msg['topic'],
+                '資料': msg['data'],
+                '時間': time.strftime('%H:%M:%S', time.localtime(msg['timestamp']))
+            })
+        else:
+            st.write(f"[{time.strftime('%H:%M:%S', time.localtime(msg['timestamp']))}] {msg['message']}")
+else:
+    st.info("尚未收到任何訊息")
+
+# 清除訊息按鈕
+if st.button("清除訊息記錄"):
+    st.session_state.mqtt_messages = []
+    st.rerun()
+```
+
+#### 發布 MQTT 訊息
+
+```python
+import streamlit as st
+import paho.mqtt.client as mqtt
+import json
+
+# 發布訊息到 MQTT
+def publish_message(topic, message, qos=0, retain=False):
+    """發布訊息到 MQTT Broker"""
+    if st.session_state.mqtt_client and st.session_state.mqtt_connected:
+        try:
+            # 如果訊息是字典，轉換為 JSON
+            if isinstance(message, dict):
+                payload = json.dumps(message)
+            else:
+                payload = str(message)
+            
+            result = st.session_state.mqtt_client.publish(
+                topic, 
+                payload, 
+                qos=qos, 
+                retain=retain
+            )
+            
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                st.success(f"✅ 訊息已發布到 {topic}")
+                return True
+            else:
+                st.error(f"❌ 發布失敗，錯誤代碼: {result.rc}")
+                return False
+        except Exception as e:
+            st.error(f"發布訊息時發生錯誤: {str(e)}")
+            return False
+    else:
+        st.warning("⚠️ 請先連接 MQTT")
+        return False
+
+# 在 Streamlit 中使用
+st.subheader("發布訊息")
+
+topic = st.text_input("主題", value="sensor/command")
+message = st.text_area("訊息內容", value='{"action": "turn_on", "device": "led"}')
+
+col1, col2 = st.columns(2)
+with col1:
+    qos = st.selectbox("QoS 等級", [0, 1, 2], index=0)
+with col2:
+    retain = st.checkbox("保留訊息", value=False)
+
+if st.button("發布訊息"):
+    publish_message(topic, message, qos=qos, retain=retain)
+```
+
+#### 即時數據視覺化
+
+```python
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import time
+
+# 在 on_message 回調中收集數據
+if 'sensor_data' not in st.session_state:
+    st.session_state.sensor_data = []
+
+# 修改 on_message 函數以收集數據
+def on_message(client, userdata, msg):
+    """收到訊息時的回調（收集數據版本）"""
+    try:
+        payload = json.loads(msg.payload.decode('utf-8'))
+        topic = msg.topic
+        
+        # 假設訊息格式為 {"temperature": 25.5, "humidity": 60}
+        if 'temperature' in payload:
+            st.session_state.sensor_data.append({
+                'timestamp': time.time(),
+                'temperature': payload.get('temperature'),
+                'humidity': payload.get('humidity', 0)
+            })
+            
+            # 只保留最近 100 筆數據
+            if len(st.session_state.sensor_data) > 100:
+                st.session_state.sensor_data.pop(0)
+    except Exception as e:
+        st.error(f"處理訊息錯誤: {str(e)}")
+
+# 在 Streamlit 中顯示圖表
+st.subheader("即時數據圖表")
+
+if st.session_state.sensor_data:
+    df = pd.DataFrame(st.session_state.sensor_data)
+    df['time'] = pd.to_datetime(df['timestamp'], unit='s')
+    
+    # 溫度圖表
+    fig_temp = px.line(df, x='time', y='temperature', 
+                       title='溫度變化', labels={'temperature': '溫度 (°C)'})
+    st.plotly_chart(fig_temp, use_container_width=True)
+    
+    # 濕度圖表
+    if 'humidity' in df.columns:
+        fig_humidity = px.line(df, x='time', y='humidity', 
+                              title='濕度變化', labels={'humidity': '濕度 (%)'})
+        st.plotly_chart(fig_humidity, use_container_width=True)
+    
+    # 顯示最新數據
+    st.metric("當前溫度", f"{df['temperature'].iloc[-1]:.1f} °C")
+    if 'humidity' in df.columns:
+        st.metric("當前濕度", f"{df['humidity'].iloc[-1]:.1f} %")
+else:
+    st.info("等待數據...")
+```
+
+### 進階設定用法
+
+#### 自動重連機制
+
+```python
+import streamlit as st
+import paho.mqtt.client as mqtt
+import time
+import threading
+
+class MQTTManager:
+    """MQTT 管理器，包含自動重連功能"""
+    
+    def __init__(self, broker, port, username=None, password=None):
+        self.broker = broker
+        self.port = port
+        self.username = username
+        self.password = password
+        self.client = None
+        self.connected = False
+        self.reconnect_delay = 5  # 重連延遲（秒）
+        self.max_reconnect_delay = 60
+        self.reconnect_count = 0
+        self.subscribed_topics = []
+        
+    def on_connect(self, client, userdata, flags, rc):
+        """連接成功回調"""
+        if rc == 0:
+            self.connected = True
+            self.reconnect_count = 0
+            st.session_state.mqtt_messages.append({
+                'type': 'system',
+                'message': '✅ MQTT 連接成功',
+                'timestamp': time.time()
+            })
+            
+            # 重新訂閱所有主題
+            for topic, qos in self.subscribed_topics:
+                client.subscribe(topic, qos)
+        else:
+            self.connected = False
+            error_messages = {
+                1: "協議版本不正確",
+                2: "客戶端 ID 無效",
+                3: "伺服器不可用",
+                4: "用戶名或密碼錯誤",
+                5: "未授權"
+            }
+            error_msg = error_messages.get(rc, f"未知錯誤 ({rc})")
+            st.session_state.mqtt_messages.append({
+                'type': 'error',
+                'message': f'❌ 連接失敗: {error_msg}',
+                'timestamp': time.time()
+            })
+    
+    def on_disconnect(self, client, userdata, rc):
+        """斷開連接回調"""
+        self.connected = False
+        if rc != 0:
+            # 非正常斷開，嘗試重連
+            st.session_state.mqtt_messages.append({
+                'type': 'system',
+                'message': '⚠️ 連接意外斷開，嘗試重連...',
+                'timestamp': time.time()
+            })
+            self.auto_reconnect()
+    
+    def on_message(self, client, userdata, msg):
+        """訊息接收回調"""
+        try:
+            payload = json.loads(msg.payload.decode('utf-8'))
+            topic = msg.topic
+            
+            st.session_state.mqtt_messages.append({
+                'type': 'message',
+                'topic': topic,
+                'data': payload,
+                'timestamp': time.time()
+            })
+        except Exception as e:
+            st.error(f"處理訊息錯誤: {str(e)}")
+    
+    def connect(self):
+        """建立連接"""
+        try:
+            self.client = mqtt.Client()
+            
+            if self.username and self.password:
+                self.client.username_pw_set(self.username, self.password)
+            
+            self.client.on_connect = self.on_connect
+            self.client.on_message = self.on_message
+            self.client.on_disconnect = self.on_disconnect
+            
+            # 設定遺囑訊息（Last Will and Testament）
+            self.client.will_set("device/status", "offline", qos=1, retain=True)
+            
+            self.client.connect(self.broker, self.port, 60)
+            self.client.loop_start()
+            
+            return True
+        except Exception as e:
+            st.error(f"連接失敗: {str(e)}")
+            return False
+    
+    def auto_reconnect(self):
+        """自動重連"""
+        def reconnect_loop():
+            while not self.connected:
+                delay = min(self.reconnect_delay * (2 ** self.reconnect_count), 
+                           self.max_reconnect_delay)
+                time.sleep(delay)
+                
+                try:
+                    if self.client:
+                        self.client.reconnect()
+                    else:
+                        self.connect()
+                    self.reconnect_count += 1
+                except:
+                    pass
+        
+        thread = threading.Thread(target=reconnect_loop, daemon=True)
+        thread.start()
+    
+    def subscribe(self, topic, qos=0):
+        """訂閱主題"""
+        if (topic, qos) not in self.subscribed_topics:
+            self.subscribed_topics.append((topic, qos))
+        
+        if self.client and self.connected:
+            self.client.subscribe(topic, qos)
+    
+    def publish(self, topic, payload, qos=0, retain=False):
+        """發布訊息"""
+        if self.client and self.connected:
+            if isinstance(payload, dict):
+                payload = json.dumps(payload)
+            return self.client.publish(topic, payload, qos=qos, retain=retain)
+        return None
+    
+    def disconnect(self):
+        """斷開連接"""
+        if self.client:
+            self.client.loop_stop()
+            self.client.disconnect()
+            self.connected = False
+
+# 使用範例
+if 'mqtt_manager' not in st.session_state:
+    st.session_state.mqtt_manager = MQTTManager(
+        broker="192.168.0.252",
+        port=1883,
+        username="pi",
+        password="raspberry"
+    )
+
+if st.button("連接 MQTT（自動重連）"):
+    st.session_state.mqtt_manager.connect()
+    st.session_state.mqtt_manager.subscribe("sensor/#", qos=1)
+```
+
+#### 多主題訂閱和過濾
+
+```python
+import streamlit as st
+import re
+
+class TopicFilter:
+    """主題過濾器，支援萬用字元"""
+    
+    def __init__(self):
+        self.filters = {}  # {pattern: callback}
+    
+    def add_filter(self, pattern, callback):
+        """添加主題過濾器"""
+        # 將 MQTT 萬用字元轉換為正則表達式
+        regex_pattern = pattern.replace('+', '[^/]+').replace('#', '.*')
+        self.filters[pattern] = {
+            'regex': re.compile(f'^{regex_pattern}$'),
+            'callback': callback
+        }
+    
+    def match(self, topic):
+        """匹配主題並執行對應的回調"""
+        for pattern, filter_info in self.filters.items():
+            if filter_info['regex'].match(topic):
+                filter_info['callback'](topic)
+                return True
+        return False
+
+# 使用範例
+topic_filter = TopicFilter()
+
+# 訂閱不同主題並設定不同的處理方式
+def handle_temperature(topic):
+    st.write(f"處理溫度數據: {topic}")
+
+def handle_humidity(topic):
+    st.write(f"處理濕度數據: {topic}")
+
+topic_filter.add_filter("sensor/+/temperature", handle_temperature)
+topic_filter.add_filter("sensor/+/humidity", handle_humidity)
+
+# 在 on_message 中使用
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    topic_filter.match(topic)
+```
+
+#### QoS 等級和訊息確認
+
+```python
+import streamlit as st
+
+# QoS 等級說明
+st.subheader("MQTT QoS 等級")
+
+st.markdown("""
+**QoS 0 - 最多一次傳遞（Fire and Forget）**
+- 訊息只發送一次，不保證送達
+- 適用於：頻繁且可容忍丟失的數據（如感測器讀數）
+
+**QoS 1 - 至少一次傳遞（At Least Once）**
+- 保證訊息至少送達一次，可能重複
+- 適用於：重要但可容忍重複的數據
+
+**QoS 2 - 恰好一次傳遞（Exactly Once）**
+- 保證訊息恰好送達一次
+- 適用於：關鍵且不能重複的數據（如支付、控制指令）
+""")
+
+# 根據重要性選擇 QoS
+def publish_with_appropriate_qos(topic, message, importance="normal"):
+    """根據重要性選擇適當的 QoS"""
+    qos_map = {
+        "low": 0,      # 可容忍丟失
+        "normal": 1,   # 重要但可重複
+        "critical": 2  # 關鍵且不能重複
+    }
+    
+    qos = qos_map.get(importance, 1)
+    
+    if st.session_state.mqtt_client:
+        result = st.session_state.mqtt_client.publish(topic, message, qos=qos)
+        
+        # 等待發布確認（QoS > 0）
+        if qos > 0:
+            result.wait_for_publish()
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                st.success(f"✅ 訊息已確認送達 (QoS {qos})")
+            else:
+                st.error(f"❌ 訊息發布失敗")
+        
+        return result
+```
+
+#### 保留訊息和持久會話
+
+```python
+import streamlit as st
+
+# 使用保留訊息儲存設備狀態
+def publish_retained_message(topic, message):
+    """發布保留訊息"""
+    if st.session_state.mqtt_client:
+        result = st.session_state.mqtt_client.publish(
+            topic, 
+            message, 
+            qos=1, 
+            retain=True  # 保留訊息
+        )
+        st.info("💾 訊息已保留，新訂閱者將立即收到此訊息")
+
+# 使用持久會話（Clean Session = False）
+def connect_with_persistent_session():
+    """使用持久會話連接"""
+    client_id = f"streamlit_client_{int(time.time())}"
+    client = mqtt.Client(
+        client_id=client_id,
+        clean_session=False  # 持久會話
+    )
+    
+    # 這樣即使斷線，未確認的訊息也會在重連後收到
+    return client
+```
+
+#### 安全連接（TLS/SSL）
+
+```python
+import streamlit as st
+import paho.mqtt.client as mqtt
+import ssl
+
+def connect_with_tls(broker, port, ca_cert=None, certfile=None, keyfile=None):
+    """使用 TLS/SSL 安全連接"""
+    client = mqtt.Client()
+    
+    # 設定 TLS
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    
+    if ca_cert:
+        context.load_verify_locations(ca_cert)
+    
+    if certfile and keyfile:
+        context.load_cert_chain(certfile, keyfile)
+    
+    client.tls_set_context(context)
+    
+    # 連接（通常 TLS 使用 8883 端口）
+    client.connect(broker, port, 60)
+    client.loop_start()
+    
+    return client
+
+# 使用範例
+# client = connect_with_tls(
+#     broker="mqtt.example.com",
+#     port=8883,
+#     ca_cert="/path/to/ca.crt"
+# )
+```
+
+#### 完整範例：物聯網設備控制儀表板
+
+```python
+import streamlit as st
+import paho.mqtt.client as mqtt
+import json
+import pandas as pd
+import plotly.express as px
+import time
+from datetime import datetime
+
+st.set_page_config(page_title="物聯網控制中心", layout="wide")
+
+# MQTT 設定
+MQTT_CONFIG = {
+    'broker': st.sidebar.text_input("MQTT Broker", value="192.168.0.252"),
+    'port': st.sidebar.number_input("端口", value=1883),
+    'username': st.sidebar.text_input("用戶名", value="pi"),
+    'password': st.sidebar.text_input("密碼", type="password", value="raspberry")
+}
+
+# 初始化
+if 'mqtt_client' not in st.session_state:
+    st.session_state.mqtt_client = None
+if 'device_status' not in st.session_state:
+    st.session_state.device_status = {}
+if 'sensor_history' not in st.session_state:
+    st.session_state.sensor_history = []
+
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        st.session_state.mqtt_client.subscribe("device/+/status", qos=1)
+        st.session_state.mqtt_client.subscribe("sensor/+/data", qos=0)
+        st.success("✅ 已連接")
+
+def on_message(client, userdata, msg):
+    topic_parts = msg.topic.split('/')
+    try:
+        data = json.loads(msg.payload.decode())
+        
+        if topic_parts[0] == 'device' and topic_parts[2] == 'status':
+            device_id = topic_parts[1]
+            st.session_state.device_status[device_id] = data
+        
+        elif topic_parts[0] == 'sensor' and topic_parts[2] == 'data':
+            sensor_id = topic_parts[1]
+            data['sensor_id'] = sensor_id
+            data['timestamp'] = time.time()
+            st.session_state.sensor_history.append(data)
+            
+            # 只保留最近 1000 筆
+            if len(st.session_state.sensor_history) > 1000:
+                st.session_state.sensor_history.pop(0)
+    except:
+        pass
+
+# 連接控制
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("連接 MQTT"):
+        if st.session_state.mqtt_client is None:
+            client = mqtt.Client()
+            client.username_pw_set(MQTT_CONFIG['username'], MQTT_CONFIG['password'])
+            client.on_connect = on_connect
+            client.on_message = on_message
+            client.connect(MQTT_CONFIG['broker'], MQTT_CONFIG['port'], 60)
+            client.loop_start()
+            st.session_state.mqtt_client = client
+
+with col2:
+    if st.button("斷開連接"):
+        if st.session_state.mqtt_client:
+            st.session_state.mqtt_client.loop_stop()
+            st.session_state.mqtt_client.disconnect()
+            st.session_state.mqtt_client = None
+
+# 設備控制面板
+st.header("設備控制")
+
+device_id = st.text_input("設備 ID", value="led_01")
+command = st.selectbox("指令", ["on", "off", "toggle"])
+
+if st.button("發送指令"):
+    if st.session_state.mqtt_client:
+        payload = {"command": command, "timestamp": time.time()}
+        st.session_state.mqtt_client.publish(
+            f"device/{device_id}/command",
+            json.dumps(payload),
+            qos=1
+        )
+        st.success(f"✅ 已發送指令: {command}")
+
+# 設備狀態顯示
+st.header("設備狀態")
+if st.session_state.device_status:
+    for device_id, status in st.session_state.device_status.items():
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.metric("設備", device_id)
+        with col2:
+            st.json(status)
+
+# 感測器數據視覺化
+st.header("感測器數據")
+if st.session_state.sensor_history:
+    df = pd.DataFrame(st.session_state.sensor_history)
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
+    
+    # 選擇感測器
+    sensors = df['sensor_id'].unique()
+    selected_sensor = st.selectbox("選擇感測器", sensors)
+    
+    sensor_df = df[df['sensor_id'] == selected_sensor]
+    
+    # 圖表
+    if 'temperature' in sensor_df.columns:
+        fig = px.line(sensor_df, x='datetime', y='temperature', 
+                     title=f'{selected_sensor} 溫度變化')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # 最新數據
+    if not sensor_df.empty:
+        latest = sensor_df.iloc[-1]
+        cols = st.columns(len([c for c in latest.index if c not in ['sensor_id', 'timestamp', 'datetime']]))
+        for i, col in enumerate([c for c in latest.index if c not in ['sensor_id', 'timestamp', 'datetime']]):
+            with cols[i]:
+                st.metric(col, latest[col])
+```
+
+### MQTT 最佳實踐
+
+1. **選擇適當的 QoS 等級**
+   - 感測器數據：QoS 0
+   - 設備狀態：QoS 1
+   - 關鍵控制指令：QoS 2
+
+2. **使用主題層級結構**
+   ```
+   device/{device_id}/status
+   device/{device_id}/command
+   sensor/{sensor_id}/data
+   ```
+
+3. **實作自動重連機制**
+   - 處理網路不穩定的情況
+   - 使用指數退避策略
+
+4. **使用保留訊息儲存狀態**
+   - 新訂閱者可以立即獲得最新狀態
+   - 適用於設備狀態、配置等
+
+5. **安全考量**
+   - 使用 TLS/SSL 加密連接
+   - 實作用戶認證
+   - 使用 ACL（存取控制列表）限制主題存取
+
+6. **效能優化**
+   - 避免在回調函數中執行耗時操作
+   - 使用背景執行緒處理數據
+   - 限制訊息歷史記錄的數量
+
 ## 參考資源
 
 ### 官方資源
