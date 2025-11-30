@@ -7,11 +7,15 @@ from machine import Pin, Timer
 import binascii
 import time
 import machine
+import network
 from umqtt.simple import MQTTClient
-import tools  # 假設有 tools 模組用於 WiFi 連線
+
+# WiFi 設定（請修改為您的 WiFi 資訊）
+WIFI_SSID = "F602-15D"  # 請修改
+WIFI_PASSWORD = "raspberry"  # 請修改
 
 # MQTT 設定
-MQTT_SERVER = "192.168.0.252"
+MQTT_SERVER = "localhost"
 MQTT_PORT = 1883
 MQTT_USERNAME = "pi"
 MQTT_PASSWORD = "raspberry"
@@ -65,6 +69,41 @@ def mqtt_callback(topic, msg):
     # 收到訊息時，讓 LED 亮 0.1 秒
     blink_led(100)  # 100 毫秒 = 0.1 秒
 
+def connect_wifi(ssid, password):
+    '''
+    連接 WiFi
+    :param ssid: WiFi 名稱
+    :param password: WiFi 密碼
+    :return: True 如果連接成功，False 如果失敗
+    '''
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    
+    if not wlan.isconnected():
+        print(f"正在連接 WiFi: {ssid}...")
+        wlan.connect(ssid, password)
+        
+        # 等待連接，最多等待 10 秒
+        max_wait = 10
+        while max_wait > 0:
+            if wlan.isconnected():
+                break
+            max_wait -= 1
+            print(".", end="")
+            time.sleep(1)
+        
+        if wlan.isconnected():
+            print("\n✅ WiFi 連接成功!")
+            print(f"   IP 位址: {wlan.ifconfig()[0]}")
+            return True
+        else:
+            print("\n❌ WiFi 連接失敗!")
+            return False
+    else:
+        print("✅ WiFi 已連接!")
+        print(f"   IP 位址: {wlan.ifconfig()[0]}")
+        return True
+
 def main():
     global mqtt_client
     
@@ -74,14 +113,8 @@ def main():
     
     # 1. 連接 WiFi
     print("\n[1/3] 正在連接 WiFi...")
-    try:
-        tools.connect()
-        print("✅ WiFi 連接成功!")
-    except RuntimeError as e:
-        print(f"❌ WiFi 連接失敗: {e}")
-        return
-    except Exception as e:
-        print(f"❌ 未知錯誤: {e}")
+    if not connect_wifi(WIFI_SSID, WIFI_PASSWORD):
+        print("❌ 無法連接 WiFi，程式結束")
         return
     
     # 2. 連接 MQTT Broker
