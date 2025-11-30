@@ -1,14 +1,13 @@
 [project]
-name = "1026-pi-pico"
+name = "pi-pico"
 version = "0.1.0"
-description = "這是樹梅派跟Pico整合的專案"
+description = "這是樹莓派和pico整合的專案"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "flask>=3.1.2",
+    "flask-socketio>=5.5.1",
     "ipykernel>=7.1.0",
+    "openpyxl>=3.1.5",
     "paho-mqtt>=2.1.0",
-    "streamlit>=1.28.0",
-    "pandas>=2.0.0",
-    "plotly>=5.0.0",
-    "openpyxl>=3.0.0",
 ]
