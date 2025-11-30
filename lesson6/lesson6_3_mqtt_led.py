@@ -15,7 +15,9 @@ WIFI_SSID = "F602-15D"  # 請修改
 WIFI_PASSWORD = "raspberry"  # 請修改
 
 # MQTT 設定
-MQTT_SERVER = "localhost"
+# 注意：Pico 不能使用 "localhost"，必須使用 Raspberry Pi 的實際 IP 位址
+# 在 Raspberry Pi 上執行 "hostname -I" 或 "ip addr" 可以查看 IP 位址
+MQTT_SERVER = "192.168.0.252"  # 請修改為您的 Raspberry Pi IP 位址
 MQTT_PORT = 1883
 MQTT_USERNAME = "pi"
 MQTT_PASSWORD = "raspberry"
