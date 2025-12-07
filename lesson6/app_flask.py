@@ -19,6 +19,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 MQTT_BROKER = "10.218.58.186"
 MQTT_PORT = 1883
 MQTT_TOPIC = "living_room/sensor"
+MQTT_TOPIC = "living_room/sensor"
 
 # 全域數據儲存
 sensor_data = []
