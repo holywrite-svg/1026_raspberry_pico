@@ -25,17 +25,33 @@ CLIENT_ID = ubinascii.hexlify(machine.unique_id())
 TOPIC_PUB = b"pico/data"      # Pico 發送數據的主題
 TOPIC_SUB = b"pico/command"   # Pico 接收指令的主題
 
+# 一閃一閃亮晶晶的節奏 (時間單位: 秒)
+# 1 = 亮, 0 = 暗, 0.5 = 持續時間
+TWINKLE_RHYTHM = [
+    (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.5), (1, 1.0), # 一閃一閃亮晶晶
+    (0, 0.5), (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.5), (1, 1.0)  # 滿天都是小星星
+]
+
+is_playing = False
+current_note_index = 0
+note_start_time = 0
+led_pin = machine.Pin("LED", machine.Pin.OUT)
+
 # -------------------------------
 # 接收訊息的回調函式
 # -------------------------------
 def sub_cb(topic, msg):
     print(f"\n收到訊息 -> 主題: {topic.decode()}, 內容: {msg.decode()}")
     
-    # 範例：收到 "on" 開燈 (板載 LED)
+    # 範例：收到 "on" 開燈 (啟動一閃一閃亮晶晶模式)
     if msg == b"on":
-        machine.Pin("LED", machine.Pin.OUT).on()
-        print("LED 已開啟")
+        global is_playing
+        is_playing = True
+        print("🎵 啟動音樂燈光模式: 一閃一閃亮晶晶")
+        
     elif msg == b"off":
+        global is_playing
+        is_playing = False
         machine.Pin("LED", machine.Pin.OUT).off()
         print("LED 已關閉")
 
@@ -91,8 +107,31 @@ def main():
                 counter += 1
                 last_pub = now
             
+            # --- 處理 LED 音樂燈光 (非阻塞) ---
+            global is_playing, current_note_index, note_start_time
+            
+            if is_playing:
+                # 取得目前音符 (狀態, 持續時間)
+                state, duration = TWINKLE_RHYTHM[current_note_index]
+                
+                # 設定 LED 狀態
+                if state:
+                    led_pin.on()
+                else:
+                    led_pin.off()
+                
+                # 檢查這個音符是否播放完畢
+                # duration 是秒，轉成 ms
+                if time.ticks_diff(now, note_start_time) >= duration * 1000:
+                    current_note_index += 1
+                    note_start_time = now
+                    
+                    # 如果播完整首，重頭開始
+                    if current_note_index >= len(TWINKLE_RHYTHM):
+                        current_note_index = 0
+            
             # 短暫休息避免 CPU 滿載，但不要睡太久以免錯過訊息
-            time.sleep(0.1) 
+            time.sleep(0.01) 
             
     except OSError as e:
         print(f"❌ MQTT 連線或傳輸錯誤: {e}")
