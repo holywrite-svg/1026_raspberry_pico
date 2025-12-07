@@ -13,7 +13,7 @@ import machine
 # -------------------------------
 # ⚠️ 重要：請將此 IP 改為您電腦(Broker)的區域網路 IP
 # 在 Windows 開 cmd 輸入 ipconfig 查看 IPv4 位址
-MQTT_BROKER  = "10.218.58.186" 
+MQTT_BROKER = "10.218.58.186" 
 MQTT_PORT = 1883
 MQTT_USER = ""        # 如果 Broker 有設定帳號密碼請填寫
 MQTT_PASSWORD = ""
@@ -90,48 +90,60 @@ def main():
         print(f"已訂閱主題: {TOPIC_SUB.decode()}")
         
         # 4. 主迴圈
-        last_pub = time.ticks_ms()
-        counter = 0
+    top_is_playing = False
+    top_current_note_index = 0
+    top_note_start_time = 0
+
+    # 4. 主迴圈
+    last_pub = time.ticks_ms()
+    counter = 0
+
+    while True:
+        # 保持監聽 (每圈都要執行)
+        client.check_msg()
+
+        # 檢查時間是否超過 10 秒 (10000 ms)
+        now = time.ticks_ms()
+        if time.ticks_diff(now, last_pub) >= 10000:
+            msg = f"Data #{counter} from Pico"
+            client.publish(TOPIC_PUB, msg)
+            print(f"[{counter}] 已發送: {msg}")
+
+            counter += 1
+            last_pub = now
+
+        # --- 處理 LED 音樂燈光 (非阻塞) ---
+        # 為了避免與函數內的變數混淆，我們直接使用 global 的變數狀態
+        # 注意：Python 中如果在函數內對全域變數賦值，需要宣告 global
+        # 但如果是讀取則不需要，不過為了保險起見，我們統一處理
         
-        while True:
-            # 保持監聽 (每圈都要執行)
-            client.check_msg()
-            
-            # 檢查時間是否超過 10 秒 (10000 ms)
-            now = time.ticks_ms()
-            if time.ticks_diff(now, last_pub) >= 10000:
-                msg = f"Data #{counter} from Pico"
-                client.publish(TOPIC_PUB, msg)
-                print(f"[{counter}] 已發送: {msg}")
-                
-                counter += 1
-                last_pub = now
-            
-            # --- 處理 LED 音樂燈光 (非阻塞) ---
-            global is_playing, current_note_index, note_start_time
-            
-            if is_playing:
-                # 取得目前音符 (狀態, 持續時間)
-                state, duration = TWINKLE_RHYTHM[current_note_index]
-                
-                # 設定 LED 狀態
-                if state:
-                    led_pin.on()
-                else:
-                    led_pin.off()
-                
-                # 檢查這個音符是否播放完畢
-                # duration 是秒，轉成 ms
-                if time.ticks_diff(now, note_start_time) >= duration * 1000:
-                    current_note_index += 1
-                    note_start_time = now
-                    
-                    # 如果播完整首，重頭開始
-                    if current_note_index >= len(TWINKLE_RHYTHM):
-                        current_note_index = 0
-            
-            # 短暫休息避免 CPU 滿載，但不要睡太久以免錯過訊息
-            time.sleep(0.01) 
+        global is_playing, current_note_index, note_start_time
+
+        if is_playing:
+            # 取得目前音符 (狀態, 持續時間)
+            state, duration = TWINKLE_RHYTHM[current_note_index]
+
+            # 設定 LED 狀態
+            if state:
+                led_pin.on()
+            else:
+                led_pin.off()
+
+            # 檢查這個音符是否播放完畢
+            # duration 是秒，轉成 ms
+            if time.ticks_diff(now, note_start_time) >= duration * 1000:
+                current_note_index += 1
+                note_start_time = now
+
+                # 如果播完整首，重頭開始
+                if current_note_index >= len(TWINKLE_RHYTHM):
+                    current_note_index = 0
+        else:
+             # 確保停止時燈是滅的
+             pass
+
+        # 短暫休息避免 CPU 滿載，但不要睡太久以免錯過訊息
+        time.sleep(0.01) 
             
     except OSError as e:
         print(f"❌ MQTT 連線或傳輸錯誤: {e}")

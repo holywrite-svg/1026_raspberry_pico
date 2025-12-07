@@ -3,7 +3,7 @@ import time
 from umqtt.simple import MQTTClient
 
 # MQTT 設定
-MQTT_BROKER =  "10.218.58.186  # 公開測試用 Broker
+MQTT_BROKER =  "10.218.58.186"  # 公開測試用 Broker
 MQTT_PORT = 1883
 CLIENT_ID = "pico_w_publsher"
 TOPIC = "pico/test"
